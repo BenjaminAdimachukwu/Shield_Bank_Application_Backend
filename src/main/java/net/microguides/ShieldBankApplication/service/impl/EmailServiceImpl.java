@@ -4,6 +4,7 @@ import com.sendgrid.*;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
+import io.github.cdimascio.dotenv.Dotenv;
 import lombok.RequiredArgsConstructor;
 import net.microguides.ShieldBankApplication.dto.EmailDetails;
 import net.microguides.ShieldBankApplication.service.EmailService;
@@ -13,16 +14,17 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 
 @Service
-@RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
+    private final Dotenv dotenv;
 
-    @Value("${sendgrid.api.key}")
-    private String apiKey;
-
-    @Value("${sendgrid.sender.email}")
-    private String senderEmail;
+    public EmailServiceImpl(Dotenv dotenv) {
+        this.dotenv = dotenv;
+    }
 
     public void sendEmailAlert(EmailDetails emailDetails) {
+        String apiKey = dotenv.get("SENDGRID_API_KEY");
+        String senderEmail = dotenv.get("SENDGRID_SENDER_EMAIL");
+
         Email from = new Email(senderEmail);
         Email to = new Email(emailDetails.getRecipient());
         Content content = new Content("text/plain", emailDetails.getMessageBody());
