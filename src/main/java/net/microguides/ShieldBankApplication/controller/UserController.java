@@ -1,9 +1,6 @@
 package net.microguides.ShieldBankApplication.controller;
 
-import net.microguides.ShieldBankApplication.dto.BankResponse;
-import net.microguides.ShieldBankApplication.dto.CreditDebitRequest;
-import net.microguides.ShieldBankApplication.dto.EnquiryRequest;
-import net.microguides.ShieldBankApplication.dto.UserRequest;
+import net.microguides.ShieldBankApplication.dto.*;
 import net.microguides.ShieldBankApplication.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,5 +37,10 @@ public class UserController {
     @PostMapping("/debit")
     public BankResponse debitAccount( @RequestBody CreditDebitRequest request){
       return  userService.debitAccount(request);
+    }
+
+    @PostMapping("transfer")
+    public  BankResponse transfer(@RequestBody TransferRequest request){
+        return  userService.transfer(request);
     }
 }

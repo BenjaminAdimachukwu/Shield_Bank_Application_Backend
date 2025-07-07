@@ -1,9 +1,6 @@
 package net.microguides.ShieldBankApplication.service;
 
-import net.microguides.ShieldBankApplication.dto.BankResponse;
-import net.microguides.ShieldBankApplication.dto.CreditDebitRequest;
-import net.microguides.ShieldBankApplication.dto.EnquiryRequest;
-import net.microguides.ShieldBankApplication.dto.UserRequest;
+import net.microguides.ShieldBankApplication.dto.*;
 
 public interface UserService {
     BankResponse createAccount(UserRequest userRequest) ;
@@ -11,5 +8,6 @@ public interface UserService {
     String nameEnquiry (EnquiryRequest request);
     BankResponse creditAccount(CreditDebitRequest request);
     BankResponse debitAccount(CreditDebitRequest request);
+    BankResponse transfer(TransferRequest request);
 }
 

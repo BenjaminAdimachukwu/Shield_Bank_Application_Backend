@@ -17,7 +17,11 @@ public class AccountUtils {
     public  static  final String INSUFFICIENT_BALANCE_CODE = "006";
     public static final  String INSUFFICIENT_BALANCE_MESSAGE = "insufficient Balance";
     public  static  final  String ACCOUNT_DEBITED_MESSAGE = "Account  has been successfully debited";
-public  static  final  String ACCOUNT_DEBITED_SUCCESS = "007";
+    public  static  final  String ACCOUNT_DEBITED_SUCCESS = "007";
+    public static  final  String TRANSFER_SUCCESSFUL_CODE = "008";
+    public static  final  String TRANSFER_SUCCESSFUL_MESSAGE = "Transfer successful";
+    public static final  String INVALID_AMOUNT_MESSAGE = "Amount must be positive and in valid format";;
+    public static final String INVALID_AMOUNT_CODE = "000";
     public static String generateAccountNumber() {
         Year currentYear = Year.now(); // e.g., 2025
         int min = 100000;

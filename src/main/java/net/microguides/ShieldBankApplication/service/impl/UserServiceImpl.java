@@ -2,6 +2,8 @@ package net.microguides.ShieldBankApplication.service.impl;
 
 import net.microguides.ShieldBankApplication.dto.*;
 import net.microguides.ShieldBankApplication.entity.User;
+import net.microguides.ShieldBankApplication.exception.AccountNotFoundException;
+import net.microguides.ShieldBankApplication.exception.InsufficientBalanceException;
 import net.microguides.ShieldBankApplication.repository.UserRepository;
 import net.microguides.ShieldBankApplication.service.EmailService;
 import net.microguides.ShieldBankApplication.service.UserService;
@@ -85,7 +87,7 @@ public class UserServiceImpl implements UserService {
                     .accountInfo(null)
                     .build();
         }
-       User foundUser = userRepository.findByAccountNumber(request.getAccountNumber());
+       User foundUser = userRepository.findByAccountNumber(request.getAccountNumber()).orElseThrow(()-> new AccountNotFoundException("this account does not exist"));
 
         return BankResponse.builder()
                 .responseCode(AccountUtils.ACCOUNT_FOUND_CODE)
@@ -106,7 +108,7 @@ public class UserServiceImpl implements UserService {
            return AccountUtils.ACCOUNT_NOT_EXISTS_MESSAGE;
         }
 
-        User foundUser = userRepository.findByAccountNumber(request.getAccountNumber());
+        User foundUser = userRepository.findByAccountNumber(request.getAccountNumber()) .orElseThrow(() -> new AccountNotFoundException("Source account not found"));
         return foundUser.getFirstName() + " " + foundUser.getLastName() + " " + foundUser.getOtherName();
     }
 
@@ -122,7 +124,7 @@ public class UserServiceImpl implements UserService {
                     .accountInfo(null)
                     .build();
         }
-        User userToCredit = userRepository.findByAccountNumber(request.getAccountNumber());
+        User userToCredit = userRepository.findByAccountNumber(request.getAccountNumber()) .orElseThrow(() -> new AccountNotFoundException("Source account not found"));
        userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(request.getAmount()));
        userRepository.save(userToCredit);
 
@@ -149,7 +151,7 @@ public class UserServiceImpl implements UserService {
                     .accountInfo(null)
                     .build();
         }
-        User userToDebit = userRepository.findByAccountNumber(request.getAccountNumber());
+        User userToDebit = userRepository.findByAccountNumber(request.getAccountNumber()) .orElseThrow(() -> new AccountNotFoundException("Source account not found"));
 
         //check if the amount you intend to withdraw is not more than the current account balance
         BigDecimal availableBalance = userToDebit.getAccountBalance();
@@ -178,6 +180,86 @@ public class UserServiceImpl implements UserService {
                    .build();
        }
 
+
+    }
+
+    @Override
+    public BankResponse transfer(TransferRequest request) {
+
+        // get account to debit
+        // check if the amount i am debiting is not more than the current account
+        // debit the account
+        //get the account to credit
+
+
+        //boolean isDestinationAccountExists = userRepository.existsByAccountNumber(request.getDestinationAccountNumber());
+        // 1. Validate request parameters first
+        if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0){
+            return BankResponse.builder()
+                    .responseCode(AccountUtils.INVALID_AMOUNT_CODE)
+                    .responseMessage(AccountUtils.INVALID_AMOUNT_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+        // 2. Check if destination account exists
+        if(!userRepository.existsByAccountNumber(request.getDestinationAccountNumber())){
+            return BankResponse.builder()
+                    .responseCode(AccountUtils.ACCOUNT_NOT_EXISTS_CODE)
+                    .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+
+       // 3. Get and validate source account
+        User sourceAccountUser = userRepository.findByAccountNumber(request.getSourceAccountNumber())
+                .orElseThrow(() -> new AccountNotFoundException("Source account not found"));
+
+        BigDecimal requestedAmount = request.getAmount();
+        BigDecimal sourceBalance  = sourceAccountUser.getAccountBalance();
+
+        if (requestedAmount.compareTo(sourceBalance ) > 0) {
+//            throw new InsufficientBalanceException(
+//                    String.format("Requested %s exceeds balance %s", requestedAmount, accountBalance)
+//            );
+            return  BankResponse.builder()
+                    .responseCode(AccountUtils.INSUFFICIENT_BALANCE_CODE)
+                    .responseMessage(AccountUtils.INSUFFICIENT_BALANCE_MESSAGE)
+                    .accountInfo(null)
+                    .build();
+        }
+        // 4. Perform transfer
+        sourceAccountUser.setAccountBalance(sourceBalance .subtract(requestedAmount));
+        userRepository.save(sourceAccountUser);
+
+        String sourceUsername = sourceAccountUser.getFirstName() + " " + sourceAccountUser.getLastName()+ " " + sourceAccountUser.getOtherName();
+        EmailDetails debitAlert = EmailDetails.builder()
+                .subject("DEBIT ALERT!")
+                .recipient(sourceAccountUser.getEmail())
+                .messageBody("The sum of " + request.getAmount() + " was debited from your account." + " Your current Balance is " + sourceAccountUser.getAccountBalance())
+                .build();
+        emailService.sendEmailAlert(debitAlert);
+
+        User destinationAccountUser = userRepository.findByAccountNumber(request.getDestinationAccountNumber()).orElseThrow(()-> new AccountNotFoundException("this account does not exist"));
+        destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(requestedAmount));
+        String recipientUserName = destinationAccountUser.getFirstName() + " " + destinationAccountUser.getLastName() + " " + destinationAccountUser.getOtherName();
+        userRepository.save(destinationAccountUser);
+
+        EmailDetails creditAlert = EmailDetails.builder()
+                .subject("CREDIT ALERT!")
+                .recipient(destinationAccountUser.getEmail())
+                .messageBody("The sum of " + request.getAmount() + " has been sent to your account from" + sourceUsername + " Your current Balance is " + destinationAccountUser.getAccountBalance())
+                .build();
+        emailService.sendEmailAlert(creditAlert);
+
+        return  BankResponse.builder()
+                .responseCode(AccountUtils.TRANSFER_SUCCESSFUL_CODE)
+                .responseMessage(AccountUtils.TRANSFER_SUCCESSFUL_MESSAGE)
+                .accountInfo(AccountInfo.builder()
+                        .accountName(sourceAccountUser.getFirstName() + " " + sourceAccountUser.getLastName() +" " + sourceAccountUser.getOtherName())
+                        .accountNumber(sourceAccountUser.getAccountNumber())
+                        .accountBalance(sourceAccountUser.getAccountBalance())
+                        .build())
+                .build();
 
     }
 }
