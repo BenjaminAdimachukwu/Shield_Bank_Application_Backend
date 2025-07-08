@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import net.microguides.ShieldBankApplication.Enums.TransactionStatus;
 import net.microguides.ShieldBankApplication.Enums.TransactionType;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,6 +37,7 @@ public class Transaction {
     @Version
     private Long version;
 
+    @CreationTimestamp
     private LocalDateTime timeStamp;
 
 }
