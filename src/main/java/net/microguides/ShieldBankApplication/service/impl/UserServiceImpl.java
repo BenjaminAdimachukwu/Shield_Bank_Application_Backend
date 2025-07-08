@@ -6,6 +6,7 @@ import net.microguides.ShieldBankApplication.exception.AccountNotFoundException;
 import net.microguides.ShieldBankApplication.exception.InsufficientBalanceException;
 import net.microguides.ShieldBankApplication.repository.UserRepository;
 import net.microguides.ShieldBankApplication.service.EmailService;
+import net.microguides.ShieldBankApplication.service.TransactionService;
 import net.microguides.ShieldBankApplication.service.UserService;
 import net.microguides.ShieldBankApplication.utils.AccountUtils;
 import org.springframework.stereotype.Service;
@@ -17,10 +18,12 @@ public class UserServiceImpl implements UserService {
 
     private UserRepository userRepository;
     private EmailService emailService;
+    private TransactionService transactionService;
 
-    public UserServiceImpl(UserRepository userRepository, EmailService emailService) {
+    public UserServiceImpl(UserRepository userRepository, EmailService emailService, TransactionService transactionService) {
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.transactionService = transactionService;
     }
 
 
@@ -123,10 +126,20 @@ public class UserServiceImpl implements UserService {
                     .responseMessage(AccountUtils.ACCOUNT_NOT_EXISTS_MESSAGE)
                     .accountInfo(null)
                     .build();
+
         }
         User userToCredit = userRepository.findByAccountNumber(request.getAccountNumber()) .orElseThrow(() -> new AccountNotFoundException("Source account not found"));
        userToCredit.setAccountBalance(userToCredit.getAccountBalance().add(request.getAmount()));
        userRepository.save(userToCredit);
+
+       // save the transaction
+        TransactionDTO transactionDTO = TransactionDTO.builder()
+                .accountNumber(userToCredit.getAccountNumber())
+                .transactionType("DEPOSIT")
+                .status("COMPLETED")
+                .amount(request.getAmount())
+                .build();
+               transactionService.saveTransaction(transactionDTO);
 
         return BankResponse.builder()
                 .responseCode(AccountUtils.ACCOUNT_CREDITED_SUCCESS)
@@ -168,6 +181,13 @@ public class UserServiceImpl implements UserService {
            userToDebit.setAccountBalance(userToDebit.getAccountBalance().subtract(request.getAmount()));
 
            userRepository.save(userToDebit);
+           TransactionDTO transactionDTO = TransactionDTO.builder()
+                   .accountNumber(userToDebit.getAccountNumber())
+                   .transactionType("WITHDRAWAL")
+                   .status("COMPLETED")
+                   .amount(request.getAmount())
+                   .build();
+           transactionService.saveTransaction(transactionDTO);
 
            return    BankResponse.builder()
                    .responseCode(AccountUtils.ACCOUNT_DEBITED_SUCCESS)
@@ -231,6 +251,15 @@ public class UserServiceImpl implements UserService {
         sourceAccountUser.setAccountBalance(sourceBalance .subtract(requestedAmount));
         userRepository.save(sourceAccountUser);
 
+        TransactionDTO debitTransactionDTO = TransactionDTO.builder()
+                .accountNumber(sourceAccountUser.getAccountNumber())
+                .transactionType("TRANSFER")
+                .status("COMPLETED")
+                .amount(request.getAmount())
+                .build();
+        transactionService.saveTransaction(debitTransactionDTO);
+
+
         String sourceUsername = sourceAccountUser.getFirstName() + " " + sourceAccountUser.getLastName()+ " " + sourceAccountUser.getOtherName();
         EmailDetails debitAlert = EmailDetails.builder()
                 .subject("DEBIT ALERT!")
@@ -243,6 +272,14 @@ public class UserServiceImpl implements UserService {
         destinationAccountUser.setAccountBalance(destinationAccountUser.getAccountBalance().add(requestedAmount));
         String recipientUserName = destinationAccountUser.getFirstName() + " " + destinationAccountUser.getLastName() + " " + destinationAccountUser.getOtherName();
         userRepository.save(destinationAccountUser);
+
+        TransactionDTO creditTransactionDTO = TransactionDTO.builder()
+                .accountNumber(destinationAccountUser.getAccountNumber())
+                .transactionType("DEPOSIT")
+                .status("COMPLETED")
+                .amount(request.getAmount())
+                .build();
+        transactionService.saveTransaction(creditTransactionDTO);
 
         EmailDetails creditAlert = EmailDetails.builder()
                 .subject("CREDIT ALERT!")
