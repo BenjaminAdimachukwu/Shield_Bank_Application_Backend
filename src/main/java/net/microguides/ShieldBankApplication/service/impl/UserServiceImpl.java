@@ -1,5 +1,7 @@
 package net.microguides.ShieldBankApplication.service.impl;
 
+import net.microguides.ShieldBankApplication.Enums.Role;
+import net.microguides.ShieldBankApplication.config.JwtTokenProvider;
 import net.microguides.ShieldBankApplication.dto.*;
 import net.microguides.ShieldBankApplication.entity.User;
 import net.microguides.ShieldBankApplication.exception.AccountNotFoundException;
@@ -9,6 +11,10 @@ import net.microguides.ShieldBankApplication.service.EmailService;
 import net.microguides.ShieldBankApplication.service.TransactionService;
 import net.microguides.ShieldBankApplication.service.UserService;
 import net.microguides.ShieldBankApplication.utils.AccountUtils;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,11 +25,17 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
     private EmailService emailService;
     private TransactionService transactionService;
+    private PasswordEncoder passwordEncoder;
+    private AuthenticationManager authenticationManager;
+    private JwtTokenProvider jwtTokenProvider;
 
-    public UserServiceImpl(UserRepository userRepository, EmailService emailService, TransactionService transactionService) {
+    public UserServiceImpl(UserRepository userRepository, EmailService emailService, TransactionService transactionService, PasswordEncoder passwordEncoder, AuthenticationManager authenticationManager, JwtTokenProvider jwtTokenProvider) {
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.transactionService = transactionService;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
 
@@ -53,9 +65,11 @@ public class UserServiceImpl implements UserService {
                 .accountNumber(AccountUtils.generateAccountNumber())
                 .accountBalance(BigDecimal.ZERO)
                 .email(userRequest.getEmail())
+                .password(passwordEncoder.encode(userRequest.getPassword()))
                 .phoneNumber(userRequest.getPhoneNumber())
                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                 .status("ACTIVE")
+                .role(Role.valueOf("ROLE_ADMIN"))
                 .build();
 
         User savedUser = userRepository.save(newUser);
@@ -76,6 +90,23 @@ public class UserServiceImpl implements UserService {
                         .accountBalance(savedUser.getAccountBalance())
                         .accountNumber(savedUser.getAccountNumber())
                         .build())
+                .build();
+    }
+
+    public BankResponse login(LoginDto loginDto){
+        Authentication authentication = null;
+        authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginDto.getEmail(), loginDto.getPassword())
+        );
+        EmailDetails loginAlert = EmailDetails.builder()
+                .subject("you are loggedIn")
+                .recipient(loginDto.getEmail())
+                .messageBody("you logged into your account. If you did not initiate this request, please contact your bank")
+                .build();
+        emailService.sendEmailAlert(loginAlert);
+        return  BankResponse.builder()
+                .responseCode("Login success")
+                .responseMessage(jwtTokenProvider.generateToken(authentication))
                 .build();
     }
 
@@ -299,4 +330,6 @@ public class UserServiceImpl implements UserService {
                 .build();
 
     }
+
+
 }
